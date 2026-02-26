@@ -7,10 +7,8 @@ import matplotlib.font_manager as fm
 import os
 import requests
 
-# --- [웹 앱 기본 설정] ---
 st.set_page_config(page_title="NS 글로벌 관제탑", page_icon="🏢", layout="centered")
 
-# --- [폰트 강제 고정] ---
 @st.cache_resource
 def setup_font():
     font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
@@ -23,15 +21,13 @@ def setup_font():
 
 setup_font()
 
-# --- [종목 리스트 메모리 저장 (과부하 방지)] ---
 @st.cache_data(ttl=3600*24)
 def get_krx_list():
     return fdr.StockListing('KRX')
 
-# --- [AI 비서 분석 엔진 (차단 대비 유연한 멘트 포함)] ---
 def get_premium_analysis(name, roe, pbr, debt, is_us, is_info_blocked):
     if is_info_blocked:
-        return f"💡 **[시장 관제]** 대표님, 현재 해외 데이터 센터(야후) 접속량 폭주로 일부 재무 지표 수신이 지연되었습니다. 하지만 **핵심인 20/60일선 스윙 차트는 보조 루트를 통해 완벽하게 확보**했습니다. 아래 차트로 추세를 판독하십시오."
+        return f"💡 **[시장 관제]** 대표님, 현재 해외 데이터 센터 접속 지연으로 일부 재무 지표는 생략합니다. 하지만 **핵심인 20/60일선 스윙 차트는 안전하게 확보**했습니다. 추세 판독에 집중하십시오."
 
     if any(x in name for x in ["200", "KODEX", "TIGER", "S&P", "나스닥", "ETF"]):
         return f"💡 **[시장 관제]** 지수 추종 ETF입니다. 개별 재무보다는 60일선(빨간색) 추세를 '단지 전체의 지반'이라 생각하고 20일선(노란색)의 돌파 여부를 확인하십시오."
@@ -51,7 +47,6 @@ def get_premium_analysis(name, roe, pbr, debt, is_us, is_info_blocked):
         
     return f"**📊 기업등급:** {grade}\n\n**📝 상세전략:** {strategy}\n\n*(체력: ROE {roe:.1f}% / 부채 {debt:.1f}%)*"
 
-# --- [정밀 검색 및 코드 변환 엔진] ---
 def get_ticker_by_name(name):
     direct_map = {
         "타이거200": "102110", "코덱스200": "069500",
@@ -78,27 +73,28 @@ def get_ticker_by_name(name):
     except: pass
     return clean_name, clean_name, name, True
 
-# --- [UI 화면 구성] ---
 st.title("🏢 NS 글로벌 통합 관제탑")
 st.markdown("스마트폰에 최적화된 실시간 우량주/ETF 분석 시스템입니다.")
 st.markdown("---")
 
-query = st.text_input("👉 종목명 입력 (타이거200, 아마존 등)", placeholder="여기에 입력하세요")
+query = st.text_input("👉 종목명 입력 (타이거200, 테슬라 등)", placeholder="여기에 입력하세요")
 
 if st.button("분석 시작", use_container_width=True):
     if query:
-        with st.spinner('시장 데이터를 스캔 중입니다... (우회 루트 작동 중)'):
+        with st.spinner('시장 데이터를 스캔 중입니다... (우회 루트 가동 중)'):
             yf_ticker, fdr_ticker, real_name, is_us = get_ticker_by_name(query)
             data = pd.DataFrame()
             
             try:
-                # 1. 차트 데이터 우선 확보 (한국주식은 FDR 우선, 실패 시 야후)
-                if not is_us:
-                    try:
-                        data = fdr.DataReader(fdr_ticker)
+                # [수정 완료] 미국주식/한국주식 가리지 않고 강력한 우회 엔진(FDR)을 1순위로 사용합니다.
+                try:
+                    data = fdr.DataReader(fdr_ticker)
+                    if not data.empty:
                         data = data.tail(250)
-                    except: pass
+                except: 
+                    pass
                 
+                # 우회 엔진이 혹시라도 실패하면 최후의 수단으로 야후 접속 (User-Agent 위장)
                 if data.empty:
                     session = requests.Session()
                     session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
@@ -106,7 +102,6 @@ if st.button("분석 시작", use_container_width=True):
                     data = stock.history(period="1y")
 
                 if not data.empty:
-                    # 2. 재무 데이터 확보 (야후 차단 대비 보호막 설치)
                     roe, debt, pbr = 0.0, 0.0, 1.0
                     is_info_blocked = False
                     
@@ -125,11 +120,8 @@ if st.button("분석 시작", use_container_width=True):
                         is_info_blocked = True
 
                     st.success(f"[{real_name}] 스캔 완료!")
-                    
-                    # 브리핑 출력
                     st.info(get_premium_analysis(real_name, roe, pbr, debt, is_us, is_info_blocked))
                     
-                    # 20/60일선 차트 그리기
                     data['MA20'] = data['Close'].rolling(20).mean()
                     data['MA60'] = data['Close'].rolling(60).mean()
                     
@@ -138,7 +130,6 @@ if st.button("분석 시작", use_container_width=True):
                     ax.plot(data.index[-100:], data['MA20'].tail(100), label='20MA (단기)', color='orange', linestyle='--')
                     ax.plot(data.index[-100:], data['MA60'].tail(100), label='60MA (스윙)', color='red', linewidth=2)
                     
-                    # 골든크로스 상승 탄력 구간 (빨간색 음영)
                     ax.fill_between(data.index[-100:], data['MA20'].tail(100), data['MA60'].tail(100), 
                                      where=(data['MA20'].tail(100) >= data['MA60'].tail(100)), color='red', alpha=0.1)
                     
@@ -148,7 +139,7 @@ if st.button("분석 시작", use_container_width=True):
                     
                     st.pyplot(fig)
                 else:
-                    st.error("⚠️ 데이터를 찾지 못했습니다. 종목명을 다시 확인해 주십시오.")
+                    st.error("⚠️ 데이터를 찾지 못했습니다. 종목명이나 티커(예: TSLA)를 다시 확인해 주십시오.")
             except Exception as e:
                 st.error(f"⚠️ 시스템 오류: {e}")
     else:

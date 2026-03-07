@@ -21,13 +21,19 @@ stocks = {
 "TSLA":"TSLA"
 }
 
+# 캐시 데이터 로딩
+@st.cache_data
+def load_data(ticker, period="6mo"):
+    try:
+        df = yf.download(ticker, period=period, progress=False)
+        return df
+    except:
+        return pd.DataFrame()
+
 # 검색
 ticker_input = st.text_input("종목 검색")
 
 col1,col2 = st.columns([1,2])
-
-@st.cache_data
-def load_data(ticker):
 
 # 패널
 with col1:
@@ -36,35 +42,36 @@ with col1:
 
     for name,ticker in stocks.items():
 
-        df = yf.download(ticker,period="6mo")
+        df = load_data(ticker,"6mo")
 
-        if len(df)==0:
+        if df is None or df.empty:
             continue
 
         ma20 = df["Close"].rolling(20).mean().iloc[-1]
         ma60 = df["Close"].rolling(60).mean().iloc[-1]
 
         trend = "상승" if ma20 > ma60 else "중립"
-        st.write(name,trend)
+        
+        st.write(f"{name} : {trend}")
 
 # 차트
 with col2:
 
     if ticker_input:
 
-        ticker=ticker_input.upper()
+        ticker = ticker_input.upper()
 
-        df = yf.download(ticker,period="1y")
+        df = load_data(ticker,"1y")
 
-        if len(df)==0:
+        if df is None or df.empty:
             st.write("데이터 없음")
 
         else:
 
-            df["MA20"]=df["Close"].rolling(20).mean()
-            df["MA60"]=df["Close"].rolling(60).mean()
+            df["MA20"] = df["Close"].rolling(20).mean()
+            df["MA60"] = df["Close"].rolling(60).mean()
 
-            fig,ax=plt.subplots()
+            fig,ax = plt.subplots()
 
             ax.plot(df["Close"],label="Price")
             ax.plot(df["MA20"],label="MA20")
@@ -74,7 +81,10 @@ with col2:
 
             st.pyplot(fig)
 
-            if df["MA20"].iloc[-1]>df["MA60"].iloc[-1]:
+            ma20 = df["MA20"].iloc[-1]
+            ma60 = df["MA60"].iloc[-1]
+
+            if ma20 > ma60:
                 st.write("추세 : 상승")
             else:
                 st.write("추세 : 중립")

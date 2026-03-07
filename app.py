@@ -26,6 +26,9 @@ ticker_input = st.text_input("종목 검색")
 
 col1,col2 = st.columns([1,2])
 
+@st.cache_data
+def load_data(ticker):
+
 # 패널
 with col1:
 
@@ -41,11 +44,7 @@ with col1:
         ma20 = df["Close"].rolling(20).mean().iloc[-1]
         ma60 = df["Close"].rolling(60).mean().iloc[-1]
 
-        if ma20>ma60:
-            trend="상승"
-        else:
-            trend="중립"
-
+        trend = "상승" if ma20 > ma60 else "중립"
         st.write(name,trend)
 
 # 차트
